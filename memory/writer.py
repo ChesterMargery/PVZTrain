@@ -1,10 +1,22 @@
 """
 Memory Writer Module
 Handles writing values to PVZ process memory
+
+⚠️ DEPRECATED: This module is deprecated and should not be used for new code.
+Use the Hook DLL (hook_client) instead for stable and safe memory operations.
+This module is kept for backward compatibility only.
 """
 
+import warnings
 import ctypes
 from typing import Optional
+
+# Issue deprecation warning
+warnings.warn(
+    "memory.writer is deprecated. Use hook_client for stable memory operations.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 class MemoryWriter:

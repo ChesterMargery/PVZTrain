@@ -1,8 +1,14 @@
 """
 ASM Injector Module
 Handles shellcode injection for calling game functions directly
+
+⚠️ DEPRECATED: This module is deprecated and should not be used for new code.
+Use the Hook DLL (hook_client) instead for stable and crash-free operations.
+Shellcode injection has timing issues that can cause game crashes.
+This module is kept for backward compatibility only.
 """
 
+import warnings
 import struct
 import ctypes
 from ctypes import wintypes
@@ -10,6 +16,13 @@ from typing import Optional, List
 
 from data.offsets import Offset
 from memory.reader import MemoryReader
+
+# Issue deprecation warning
+warnings.warn(
+    "memory.injector is deprecated. Use hook_client for stable operations without crashes.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 
 # Windows API constants
