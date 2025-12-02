@@ -29,7 +29,13 @@ jobs:
           python-version: '3.10'
 
       - name: Install Python dependencies
-        run: pip install -r requirements.txt
+        run: |
+          if (Test-Path requirements.txt) {
+            pip install -r requirements.txt
+          } else {
+            Write-Warning "requirements.txt not found, skipping"
+          }
+        shell: pwsh
 
       - name: Configure CMake
         working-directory: hook
@@ -77,8 +83,13 @@ jobs:
       - name: Create ZIP Archive
         shell: pwsh
         run: |
-          $tagName = "${{ github.ref_name }}"
-          $zipName = "PVZTrain-${tagName}.zip"
+          # Use commit SHA for non-tag builds, tag name for releases
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}"
+          } else {
+            $version = "${{ github.sha }}".Substring(0, 7)
+          }
+          $zipName = "PVZTrain-${version}.zip"
           Compress-Archive -Path release/PVZTrain/* `
             -DestinationPath $zipName
 
