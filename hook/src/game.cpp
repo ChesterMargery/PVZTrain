@@ -47,6 +47,20 @@ uintptr_t GetGameUI() {
     return *(uintptr_t*)(base + Addr::GAME_UI);
 }
 
+// 获取UI状态值（不是指针）
+int GetGameUIState() {
+    uintptr_t gameUI = GetGameUI();
+    if (!gameUI) return -1;
+    
+    // 验证指针是否在有效内存范围内
+    // PVZ游戏内存通常在 0x400000 - 0x10000000 范围内
+    if (gameUI < 0x400000 || gameUI > 0x10000000) {
+        return -1;
+    }
+    
+    return *(int*)gameUI;
+}
+
 int GetSun() {
     uintptr_t board = GetBoard();
     if (!board) return 0;
@@ -66,8 +80,10 @@ int GetScene() {
 }
 
 bool IsInGame() {
-    uintptr_t ui = GetGameUI();
-    return ui == 3;
+    // GetGameUI() 返回指针地址，不是UI状态值
+    // 需要读取 UI 状态字段
+    int uiState = GetGameUIState();
+    return uiState == 3;  // 3 = 游戏进行中
 }
 
 bool IsZombieInHouse() {
@@ -151,8 +167,9 @@ bool ChooseCard(int type) {
     uintptr_t base = GetBase();
     if (!base) return false;
     
-    uintptr_t gameUI = GetGameUI();
-    if (gameUI != 2) return false;  // 必须在选卡界面
+    // 正确读取UI状态
+    int uiState = GetGameUIState();
+    if (uiState != 2) return false;  // 必须在选卡界面
     
     uintptr_t seedChooser = *(uintptr_t*)(base + Addr::SEED_CHOOSER);
     if (!seedChooser) return false;
@@ -172,22 +189,28 @@ bool Rock() {
     uintptr_t base = GetBase();
     if (!base) return false;
     
-    uintptr_t gameUI = GetGameUI();
-    if (gameUI != 2) return false;
+    // 正确读取UI状态
+    int uiState = GetGameUIState();
+    if (uiState != 2) return false;  // 必须在选卡界面
     
     uintptr_t seedChooser = *(uintptr_t*)(base + Addr::SEED_CHOOSER);
     if (!seedChooser) return false;
     
     // 调用Rock函数
+    // 参考AVZ: 通过寄存器传递参数
+    // ebp通常是栈帧基址指针，直接修改会破坏调用栈
+    // 因此需要先保存，使用后恢复
     typedef void(__cdecl* RockFunc)();
     RockFunc rock = (RockFunc)Addr::FUNC_ROCK;
     
     __asm {
-        mov ebx, seedChooser
-        mov esi, base
-        mov edi, 1
-        mov ebp, 1
-        call rock
+        push ebp             // 保存ebp（栈帧基址指针）
+        mov ebx, seedChooser // ebx = seedChooser 指针
+        mov esi, base        // esi = 游戏base对象
+        mov edi, 1           // edi = 1 (参数)
+        mov ebp, 1           // ebp = 1 (参数，现在可以安全使用因为已保存原值)
+        call rock            // 调用Rock函数
+        pop ebp              // 恢复ebp到原始值
     }
     
     return true;
@@ -214,14 +237,16 @@ bool EnterGame(int mode) {
     if (!base) return false;
     
     // 调用EnterGame函数
+    // 参考AVZ: 需要通过 esi 寄存器传递 base，然后 push 两个参数
     typedef void(__cdecl* EnterGameFunc)(int mode, int ok);
     EnterGameFunc enterGame = (EnterGameFunc)Addr::FUNC_ENTER_GAME;
     
     __asm {
-        push 1          // ok = true
-        push mode       // game mode
-        mov esi, base
-        call enterGame
+        push 1          // ok = true (参数2)
+        push mode       // game mode (参数1)
+        mov esi, base   // esi = base (特殊寄存器传参，在push之后设置避免冲突)
+        call enterGame  // 调用EnterGame函数
+        add esp, 8      // 清理栈: 2个int参数 = 2 * sizeof(int) = 8字节 (cdecl调用者清理栈)
     }
     
     return true;
@@ -231,17 +256,18 @@ bool BackToMain() {
     uintptr_t base = GetBase();
     if (!base) return false;
     
-    uintptr_t gameUI = GetGameUI();
-    if (gameUI != 3) return false;
+    // 正确读取UI状态
+    int uiState = GetGameUIState();
+    if (uiState != 3) return false;  // 必须在游戏进行中
     
     // 调用BackToMain函数
+    // __thiscall: ecx = this pointer, 然后 call function_address
     typedef void(__thiscall* BackToMainFunc)(uintptr_t base);
     BackToMainFunc backToMain = (BackToMainFunc)Addr::FUNC_BACK_TO_MAIN;
     
     __asm {
-        mov eax, base
-        mov ecx, backToMain
-        call ecx
+        mov ecx, base        // ecx = this pointer (base)
+        call backToMain      // 直接 call 函数指针
     }
     
     return true;

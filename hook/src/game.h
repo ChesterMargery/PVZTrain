@@ -11,6 +11,7 @@ namespace PVZ {
 uintptr_t GetBase();
 uintptr_t GetBoard();
 uintptr_t GetGameUI();
+int GetGameUIState();  // 获取UI状态值（不是指针）
 
 // 游戏状态读取
 int GetSun();

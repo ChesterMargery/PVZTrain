@@ -51,6 +51,8 @@ std::string GetGameState() {
         if (zombieArray && zombieMax > 0 && zombieMax <= 200) {
             for (int i = 0; i < zombieMax; i++) {
                 uintptr_t addr = zombieArray + i * ZOMBIE_SIZE;
+                // 僵尸死亡标志通常在 0xEC 偏移处
+                // 注意：某些僵尸状态可能需要检查多个标志位
                 bool dead = *(bool*)(addr + Z_DEAD);
                 if (!dead) info.zombie_count++;
             }
