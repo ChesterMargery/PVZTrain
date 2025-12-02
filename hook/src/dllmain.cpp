@@ -2,51 +2,41 @@
 #include "bridge.h"
 #include "game.h"
 
-// Hook相关
-static BYTE g_originalBytes[5];
+// Hook相关 - 采用AVZ的虚函数表Hook方式
 static bool g_hooked = false;
-static constexpr uintptr_t GAME_LOOP_ADDR = 0x452650;
-
-// 原始游戏循环函数指针
-typedef void(__cdecl* GameLoopFunc)();
-static GameLoopFunc g_originalGameLoop = nullptr;
+static constexpr uintptr_t VTABLE_ADDR = 0x667bc0;  // 虚函数表地址
+static constexpr uintptr_t ORIGINAL_FUNC = 0x452650;  // 原始游戏循环函数地址
+static uint32_t g_originalVtableEntry = 0;  // 保存原始虚函数表项
 
 // 我们的Hook函数
 void __cdecl HookedGameLoop() {
     // 处理Python命令
     Bridge::ProcessCommands();
     
-    // 调用原始游戏循环
-    if (g_originalGameLoop) {
-        g_originalGameLoop();
-    }
+    // 直接调用原始函数地址
+    typedef void(__cdecl* GameLoopFunc)();
+    ((GameLoopFunc)ORIGINAL_FUNC)();
 }
 
 bool InstallHook() {
     if (g_hooked) return true;
     
-    // 保存原始字节
-    memcpy(g_originalBytes, (void*)GAME_LOOP_ADDR, 5);
-    
-    // 创建跳转指令 (jmp HookedGameLoop)
+    // 修改虚函数表指针
     DWORD oldProtect;
-    VirtualProtect((void*)GAME_LOOP_ADDR, 5, PAGE_EXECUTE_READWRITE, &oldProtect);
+    if (!VirtualProtect((void*)0x400000, 0x35E000, PAGE_EXECUTE_READWRITE, &oldProtect)) {
+        return false;
+    }
     
-    // 计算相对偏移
-    uintptr_t hookAddr = (uintptr_t)HookedGameLoop;
-    int relativeOffset = hookAddr - GAME_LOOP_ADDR - 5;
+    // 保存原始虚函数表项
+    g_originalVtableEntry = *(uint32_t*)VTABLE_ADDR;
     
-    // 写入跳转指令
-    BYTE jumpCode[5] = {
-        0xE9,  // jmp
-        (BYTE)(relativeOffset & 0xFF),
-        (BYTE)((relativeOffset >> 8) & 0xFF),
-        (BYTE)((relativeOffset >> 16) & 0xFF),
-        (BYTE)((relativeOffset >> 24) & 0xFF)
-    };
+    // 替换为我们的Hook函数
+    *(uint32_t*)VTABLE_ADDR = (uint32_t)&HookedGameLoop;
     
-    memcpy((void*)GAME_LOOP_ADDR, jumpCode, 5);
-    VirtualProtect((void*)GAME_LOOP_ADDR, 5, oldProtect, &oldProtect);
+    // 刷新指令缓存
+    FlushInstructionCache(GetCurrentProcess(), (void*)VTABLE_ADDR, sizeof(uint32_t));
+    
+    VirtualProtect((void*)0x400000, 0x35E000, oldProtect, &oldProtect);
     
     g_hooked = true;
     return true;
@@ -55,11 +45,18 @@ bool InstallHook() {
 void UninstallHook() {
     if (!g_hooked) return;
     
-    // 恢复原始字节
+    // 恢复原始虚函数表项
     DWORD oldProtect;
-    VirtualProtect((void*)GAME_LOOP_ADDR, 5, PAGE_EXECUTE_READWRITE, &oldProtect);
-    memcpy((void*)GAME_LOOP_ADDR, g_originalBytes, 5);
-    VirtualProtect((void*)GAME_LOOP_ADDR, 5, oldProtect, &oldProtect);
+    if (!VirtualProtect((void*)0x400000, 0x35E000, PAGE_EXECUTE_READWRITE, &oldProtect)) {
+        return;
+    }
+    
+    *(uint32_t*)VTABLE_ADDR = g_originalVtableEntry;
+    
+    // 刷新指令缓存
+    FlushInstructionCache(GetCurrentProcess(), (void*)VTABLE_ADDR, sizeof(uint32_t));
+    
+    VirtualProtect((void*)0x400000, 0x35E000, oldProtect, &oldProtect);
     
     g_hooked = false;
 }
