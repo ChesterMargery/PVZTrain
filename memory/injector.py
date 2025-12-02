@@ -861,11 +861,11 @@ class AsmInjector:
         
         # Based on AAsm::PickRandomSeeds (avz_asm.cpp line 887-897):
         # mov eax, [0x6a9ec0]
-        # mov eax, [eax+0x774]
+        # mov eax, [eax+SEED_CHOOSER]
         # push eax
         # mov ecx, FUNC_PICK_RANDOM (0x4859b0)
         # call ecx
-        # With ASaveAllRegister macro
+        # With ASaveAllRegister macro (push/pop ebp, ebx, esi, edi in that order)
         
         shellcode = bytes([
             # Save registers (ASaveAllRegister)
