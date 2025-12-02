@@ -40,9 +40,10 @@ jobs:
       - name: Configure CMake
         working-directory: hook
         run: |
-          mkdir build
-          cd build
+          New-Item -ItemType Directory -Force -Path build | Out-Null
+          Set-Location build
           cmake -G "Visual Studio 17 2022" -A Win32 ..
+        shell: pwsh
 
       - name: Build DLL (Release)
         working-directory: hook/build
@@ -55,30 +56,44 @@ jobs:
           New-Item -ItemType Directory -Force -Path release/PVZTrain
 
           # 复制编译好的DLL
-          Copy-Item hook/build/Release/pvz_hook.dll release/PVZTrain/
+          Copy-Item hook/build/Release/pvz_hook.dll release/PVZTrain/ `
+            -ErrorAction Stop
 
-          # 复制Python模块
-          Copy-Item -Recurse core release/PVZTrain/
-          Copy-Item -Recurse hook_client release/PVZTrain/
-          Copy-Item -Recurse memory release/PVZTrain/
-          Copy-Item -Recurse game release/PVZTrain/
-          Copy-Item -Recurse data release/PVZTrain/
-          Copy-Item -Recurse engine release/PVZTrain/
-          Copy-Item -Recurse utils release/PVZTrain/
-          Copy-Item -Recurse tools release/PVZTrain/
-          Copy-Item -Recurse examples release/PVZTrain/
+          # 复制Python模块（必需目录）
+          $requiredDirs = @(
+            'core', 'hook_client', 'memory', 'game',
+            'data', 'engine', 'utils', 'tools', 'examples'
+          )
+          foreach ($dir in $requiredDirs) {
+            if (Test-Path $dir) {
+              Copy-Item -Recurse $dir release/PVZTrain/
+            } else {
+              Write-Warning "Directory $dir not found, skipping"
+            }
+          }
 
-          # 复制配置和文档
-          Copy-Item main.py release/PVZTrain/
-          Copy-Item config.py release/PVZTrain/
-          Copy-Item requirements.txt release/PVZTrain/
-          Copy-Item README.md release/PVZTrain/
-          Copy-Item LICENSE release/PVZTrain/
-          Copy-Item HOOK_MIGRATION.md release/PVZTrain/
+          # 复制配置和文档（必需文件）
+          $requiredFiles = @(
+            'main.py', 'config.py', 'requirements.txt',
+            'README.md', 'LICENSE', 'HOOK_MIGRATION.md'
+          )
+          foreach ($file in $requiredFiles) {
+            if (Test-Path $file) {
+              Copy-Item $file release/PVZTrain/
+            } else {
+              Write-Warning "File $file not found, skipping"
+            }
+          }
 
           # 复制启动脚本
-          Copy-Item "一键启动.bat" release/PVZTrain/
-          Copy-Item "启动说明.bat" release/PVZTrain/
+          $batchFiles = @('一键启动.bat', '启动说明.bat')
+          foreach ($file in $batchFiles) {
+            if (Test-Path $file) {
+              Copy-Item $file release/PVZTrain/
+            } else {
+              Write-Warning "Batch file $file not found, skipping"
+            }
+          }
 
       - name: Create ZIP Archive
         shell: pwsh
@@ -90,8 +105,7 @@ jobs:
             $version = "${{ github.sha }}".Substring(0, 7)
           }
           $zipName = "PVZTrain-${version}.zip"
-          Compress-Archive -Path release/PVZTrain/* `
-            -DestinationPath $zipName
+          Compress-Archive -Path release/PVZTrain/* -DestinationPath $zipName
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
