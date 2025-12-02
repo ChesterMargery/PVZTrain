@@ -53,7 +53,7 @@ int GetGameUIState() {
     if (!gameUI) return -1;
     
     // 验证指针是否在有效内存范围内
-    // PVZ游戏内存通常在 0x400000 - 0x1000000 范围内
+    // PVZ游戏内存通常在 0x400000 - 0x10000000 范围内
     if (gameUI < 0x400000 || gameUI > 0x10000000) {
         return -1;
     }
@@ -197,18 +197,20 @@ bool Rock() {
     if (!seedChooser) return false;
     
     // 调用Rock函数
-    // 参考AVZ: 通过寄存器传递参数，但不修改ebp（ebp是栈帧基址指针）
+    // 参考AVZ: 通过寄存器传递参数
+    // ebp通常是栈帧基址指针，直接修改会破坏调用栈
+    // 因此需要先保存，使用后恢复
     typedef void(__cdecl* RockFunc)();
     RockFunc rock = (RockFunc)Addr::FUNC_ROCK;
     
     __asm {
-        push ebp             // 保存ebp
-        mov ebx, seedChooser
-        mov esi, base
-        mov edi, 1
-        mov ebp, 1           // 现在可以安全使用ebp作为参数
-        call rock
-        pop ebp              // 恢复ebp
+        push ebp             // 保存ebp（栈帧基址指针）
+        mov ebx, seedChooser // ebx = seedChooser 指针
+        mov esi, base        // esi = 游戏base对象
+        mov edi, 1           // edi = 1 (参数)
+        mov ebp, 1           // ebp = 1 (参数，现在可以安全使用因为已保存原值)
+        call rock            // 调用Rock函数
+        pop ebp              // 恢复ebp到原始值
     }
     
     return true;
@@ -240,11 +242,11 @@ bool EnterGame(int mode) {
     EnterGameFunc enterGame = (EnterGameFunc)Addr::FUNC_ENTER_GAME;
     
     __asm {
-        push 1          // ok = true
-        push mode       // game mode
+        push 1          // ok = true (参数2)
+        push mode       // game mode (参数1)
         mov esi, base   // esi = base (特殊寄存器传参，在push之后设置避免冲突)
-        call enterGame
-        add esp, 8      // 清理栈 (cdecl调用者清理栈)
+        call enterGame  // 调用EnterGame函数
+        add esp, 8      // 清理栈: 2个int参数 = 2 * sizeof(int) = 8字节 (cdecl调用者清理栈)
     }
     
     return true;
