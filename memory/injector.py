@@ -704,8 +704,8 @@ class AsmInjector:
         """
         Click the "Let's Rock" button in seed chooser to start the game.
         
-        Based on ClickButton at 0x484e40
-        Button index 100 = Let's Rock button
+        Based on AAsm::Rock() from avz_asm.cpp (line 111-123)
+        Uses correct function address 0x486D20 and required register setup
         
         Returns:
             True if successful
@@ -719,31 +719,53 @@ class AsmInjector:
             return False
         
         # Get seed chooser screen pointer: [base + 0x774]
-        seed_chooser = self.reader.read_int(base + 0x774)
+        seed_chooser = self.reader.read_int(base + Offset.SEED_CHOOSER)
         if not seed_chooser:
             return False
         
-        # Shellcode to click button:
-        #   push 100 (button index for "Let's Rock")
-        #   push seed_chooser
-        #   mov eax, 0x484e40
-        #   call eax
-        #   add esp, 8
+        # Based on AAsm::Rock() (avz_asm.cpp line 111-123):
+        # mov ebx, [0x6a9ec0]
+        # mov ebx, [ebx+0x774]  ; seed chooser
+        # mov eax, FUNC_ROCK (0x486d20)
+        # mov esi, [0x6a9ec0]
+        # mov edi, 1
+        # mov ebp, 1
+        # call eax
+        # With ASaveAllRegister macro
+        
         shellcode = bytes([
-            # push 100
-            0x68, *struct.pack('<I', 100),
+            # Save registers (ASaveAllRegister)
+            0x55,                           # push ebp
+            0x53,                           # push ebx
+            0x56,                           # push esi
+            0x57,                           # push edi
             
-            # push seed_chooser
-            0x68, *struct.pack('<I', seed_chooser),
+            # mov ebx, [0x6a9ec0]
+            0x8B, 0x1D, *struct.pack('<I', Offset.BASE),
             
-            # mov eax, 0x484e40
-            0xB8, *struct.pack('<I', 0x484E40),
+            # mov ebx, [ebx+0x774]  ; seed chooser
+            0x8B, 0x9B, *struct.pack('<I', Offset.SEED_CHOOSER),
+            
+            # mov eax, FUNC_ROCK (0x486d20)
+            0xB8, *struct.pack('<I', Offset.FUNC_ROCK),
+            
+            # mov esi, [0x6a9ec0]
+            0x8B, 0x35, *struct.pack('<I', Offset.BASE),
+            
+            # mov edi, 1
+            0xBF, 0x01, 0x00, 0x00, 0x00,
+            
+            # mov ebp, 1
+            0xBD, 0x01, 0x00, 0x00, 0x00,
             
             # call eax
             0xFF, 0xD0,
             
-            # add esp, 8
-            0x83, 0xC4, 0x08,
+            # Restore registers
+            0x5F,                           # pop edi
+            0x5E,                           # pop esi
+            0x5B,                           # pop ebx
+            0x5D,                           # pop ebp
             
             # ret
             0xC3
@@ -756,6 +778,7 @@ class AsmInjector:
         Choose a seed in the seed chooser screen.
         
         Based on AAsm::ChooseCard() from avz_asm.cpp
+        Uses ASaveAllRegister (saves/restores ebp, ebx, esi, edi)
         
         Args:
             plant_type: Plant type ID to choose (0=Peashooter, 1=Sunflower, etc.)
@@ -771,14 +794,15 @@ class AsmInjector:
         if game_ui != 2:  # Not in seed chooser
             return False
         
-        # Based on AAsm::ChooseCard:
+        # Based on AAsm::ChooseCard (avz_asm.cpp line 258-275):
         # mov eax, [0x6a9ec0]
         # mov eax, [eax+0x774]  ; seed chooser screen
         # edx = cardType * 15 * 4 + 0xa4 + eax  ; calculate card address
         # push edx
         # call 0x486030
+        # With ASaveAllRegister macro (push/pop ebp, ebx, esi, edi)
         
-        seed_chooser = self.reader.read_int(base + 0x774)
+        seed_chooser = self.reader.read_int(base + Offset.SEED_CHOOSER)
         if not seed_chooser:
             return False
         
@@ -786,14 +810,26 @@ class AsmInjector:
         card_addr = plant_type * 60 + 0xa4 + seed_chooser
         
         shellcode = bytes([
+            # Save registers (ASaveAllRegister)
+            0x55,                           # push ebp
+            0x53,                           # push ebx
+            0x56,                           # push esi
+            0x57,                           # push edi
+            
             # push card_addr
             0x68, *struct.pack('<I', card_addr),
             
-            # mov ecx, 0x486030
-            0xB9, *struct.pack('<I', 0x486030),
+            # mov ecx, FUNC_CHOOSE_CARD (0x486030)
+            0xB9, *struct.pack('<I', Offset.FUNC_CHOOSE_CARD),
             
             # call ecx
             0xFF, 0xD1,
+            
+            # Restore registers
+            0x5F,                           # pop edi
+            0x5E,                           # pop esi
+            0x5B,                           # pop ebx
+            0x5D,                           # pop ebp
             
             # ret
             0xC3
@@ -805,7 +841,8 @@ class AsmInjector:
         """
         Fill remaining seed slots with random seeds and start the game.
         
-        Based on AAsm::PickRandomSeeds() - this fills empty slots and clicks "Let's Rock"
+        Based on AAsm::PickRandomSeeds() from avz_asm.cpp (line 887-897)
+        Uses ASaveAllRegister (saves/restores ebp, ebx, esi, edi)
         
         Returns:
             True if successful
@@ -818,26 +855,39 @@ class AsmInjector:
         if game_ui != 2:  # Not in seed chooser
             return False
         
-        seed_chooser = self.reader.read_int(base + 0x774)
+        seed_chooser = self.reader.read_int(base + Offset.SEED_CHOOSER)
         if not seed_chooser:
             return False
         
-        # Based on AAsm::PickRandomSeeds:
+        # Based on AAsm::PickRandomSeeds (avz_asm.cpp line 887-897):
         # mov eax, [0x6a9ec0]
-        # mov eax, [eax+0x774]
+        # mov eax, [eax+SEED_CHOOSER]
         # push eax
-        # mov ecx, 0x4859b0
+        # mov ecx, FUNC_PICK_RANDOM (0x4859b0)
         # call ecx
+        # With ASaveAllRegister macro (push/pop ebp, ebx, esi, edi in that order)
         
         shellcode = bytes([
+            # Save registers (ASaveAllRegister)
+            0x55,                           # push ebp
+            0x53,                           # push ebx
+            0x56,                           # push esi
+            0x57,                           # push edi
+            
             # push seed_chooser
             0x68, *struct.pack('<I', seed_chooser),
             
-            # mov ecx, 0x4859b0
-            0xB9, *struct.pack('<I', 0x4859B0),
+            # mov ecx, FUNC_PICK_RANDOM (0x4859b0)
+            0xB9, *struct.pack('<I', Offset.FUNC_PICK_RANDOM),
             
             # call ecx
             0xFF, 0xD1,
+            
+            # Restore registers
+            0x5F,                           # pop edi
+            0x5E,                           # pop esi
+            0x5B,                           # pop ebx
+            0x5D,                           # pop ebp
             
             # ret
             0xC3
