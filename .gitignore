@@ -39,3 +39,21 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# C++ Build artifacts
+hook/build/
+*.obj
+*.o
+*.dll
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.exe
+*.out
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
