@@ -138,9 +138,13 @@ bool Shovel(int row, int col) {
 }
 
 bool FireCob(int x, int y) {
-    // 发射玉米炮需要找到炮的地址，然后调用发射函数
-    // 简化版本，实际需要更复杂的逻辑
-    return false;  // TODO: 完整实现
+    // TODO: 完整实现
+    // 发射玉米炮需要：
+    // 1. 找到对应位置的玉米炮植物
+    // 2. 检查是否ready
+    // 3. 调用发射函数
+    // 当前未实现，返回false避免误导
+    return false;
 }
 
 bool ChooseCard(int type) {

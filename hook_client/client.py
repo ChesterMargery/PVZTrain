@@ -5,8 +5,12 @@ TCP客户端，连接到Hook DLL
 
 import socket
 import json
+import logging
 from typing import Optional, Dict
 from .protocol import Command, Response
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 
 class HookClient:
@@ -26,6 +30,7 @@ class HookClient:
         self.timeout = timeout
         self.socket: Optional[socket.socket] = None
         self.connected = False
+        self.logger = logging.getLogger(__name__)
     
     def connect(self) -> bool:
         """
@@ -43,8 +48,18 @@ class HookClient:
             self.socket.connect((self.host, self.port))
             self.connected = True
             return True
+        except socket.timeout as e:
+            self.logger.error(f"Connection timeout: {e}")
+            self.socket = None
+            self.connected = False
+            return False
+        except socket.error as e:
+            self.logger.error(f"Connection failed: {e}")
+            self.socket = None
+            self.connected = False
+            return False
         except Exception as e:
-            print(f"Failed to connect to Hook DLL: {e}")
+            self.logger.error(f"Unexpected error during connection: {e}")
             self.socket = None
             self.connected = False
             return False
@@ -88,8 +103,16 @@ class HookClient:
                     break
             
             return response.decode('utf-8').strip()
+        except socket.timeout as e:
+            self.logger.error(f"Command timeout: {e}")
+            self.disconnect()
+            return None
+        except socket.error as e:
+            self.logger.error(f"Socket error: {e}")
+            self.disconnect()
+            return None
         except Exception as e:
-            print(f"Command failed: {e}")
+            self.logger.error(f"Unexpected error: {e}")
             self.disconnect()
             return None
     
@@ -211,8 +234,8 @@ class HookClient:
         try:
             # 解析JSON响应
             return json.loads(response)
-        except json.JSONDecodeError:
-            print(f"Failed to parse state: {response}")
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Failed to parse state: {e}, response: {response}")
             return None
     
     def __enter__(self):

@@ -198,9 +198,9 @@ class PVZInterface:
         item_max = self.reader.read_int(board + Offset.ITEM_COUNT_MAX)
         
         if self.mode == InterfaceMode.HOOK:
-            # In Hook mode, we can't write directly
-            # This would need to be implemented in the Hook DLL
-            # For now, skip auto-collect in Hook mode
+            # Auto-collect not implemented in Hook DLL yet
+            # Use Legacy mode if you need auto-collect
+            self.logger.warning("Auto-collect not supported in Hook mode. Use Legacy mode or implement in DLL.")
             return 0
         else:
             # Legacy mode - direct memory write

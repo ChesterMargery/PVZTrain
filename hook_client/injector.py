@@ -7,7 +7,11 @@ import os
 import ctypes
 from ctypes import wintypes
 import psutil
+import logging
 from typing import Optional
+
+# Setup logger
+logger = logging.getLogger(__name__)
 
 
 # Windows API常量
@@ -53,8 +57,8 @@ def inject_dll(dll_path: Optional[str] = None, pid: Optional[int] = None) -> boo
         dll_path = os.path.join(script_dir, 'hook', 'pvz_hook.dll')
     
     if not os.path.exists(dll_path):
-        print(f"DLL not found: {dll_path}")
-        print("Please build the DLL first using hook/build.bat")
+        logger.error(f"DLL not found: {dll_path}")
+        logger.error("Please build the DLL first using hook/build.bat")
         return False
     
     # 转换为绝对路径
@@ -64,12 +68,12 @@ def inject_dll(dll_path: Optional[str] = None, pid: Optional[int] = None) -> boo
     if pid is None:
         pid = find_pvz_process()
         if pid is None:
-            print("PVZ process not found!")
-            print("Please start the game first.")
+            logger.error("PVZ process not found!")
+            logger.error("Please start the game first.")
             return False
     
-    print(f"Found PVZ process: PID={pid}")
-    print(f"Injecting DLL: {dll_path}")
+    logger.info(f"Found PVZ process: PID={pid}")
+    logger.info(f"Injecting DLL: {dll_path}")
     
     # 获取kernel32
     kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
@@ -77,7 +81,7 @@ def inject_dll(dll_path: Optional[str] = None, pid: Optional[int] = None) -> boo
     # 打开目标进程
     hProcess = kernel32.OpenProcess(PROCESS_ALL_ACCESS, False, pid)
     if not hProcess:
-        print(f"Failed to open process: {ctypes.get_last_error()}")
+        logger.error(f"Failed to open process: {ctypes.get_last_error()}")
         return False
     
     try:
@@ -91,7 +95,7 @@ def inject_dll(dll_path: Optional[str] = None, pid: Optional[int] = None) -> boo
         )
         
         if not pDllPath:
-            print(f"Failed to allocate memory: {ctypes.get_last_error()}")
+            logger.error(f"Failed to allocate memory: {ctypes.get_last_error()}")
             return False
         
         # 写入DLL路径
@@ -99,7 +103,7 @@ def inject_dll(dll_path: Optional[str] = None, pid: Optional[int] = None) -> boo
         if not kernel32.WriteProcessMemory(
             hProcess, pDllPath, dll_path_bytes, dll_path_len, ctypes.byref(written)
         ):
-            print(f"Failed to write memory: {ctypes.get_last_error()}")
+            logger.error(f"Failed to write memory: {ctypes.get_last_error()}")
             kernel32.VirtualFreeEx(hProcess, pDllPath, 0, MEM_RELEASE)
             return False
         
@@ -108,7 +112,7 @@ def inject_dll(dll_path: Optional[str] = None, pid: Optional[int] = None) -> boo
         pLoadLibraryA = kernel32.GetProcAddress(hKernel32, b"LoadLibraryA")
         
         if not pLoadLibraryA:
-            print(f"Failed to get LoadLibraryA: {ctypes.get_last_error()}")
+            logger.error(f"Failed to get LoadLibraryA: {ctypes.get_last_error()}")
             kernel32.VirtualFreeEx(hProcess, pDllPath, 0, MEM_RELEASE)
             return False
         
@@ -119,7 +123,7 @@ def inject_dll(dll_path: Optional[str] = None, pid: Optional[int] = None) -> boo
         )
         
         if not hThread:
-            print(f"Failed to create remote thread: {ctypes.get_last_error()}")
+            logger.error(f"Failed to create remote thread: {ctypes.get_last_error()}")
             kernel32.VirtualFreeEx(hProcess, pDllPath, 0, MEM_RELEASE)
             return False
         
@@ -130,8 +134,8 @@ def inject_dll(dll_path: Optional[str] = None, pid: Optional[int] = None) -> boo
         kernel32.CloseHandle(hThread)
         kernel32.VirtualFreeEx(hProcess, pDllPath, 0, MEM_RELEASE)
         
-        print("DLL injected successfully!")
-        print("Hook DLL should be listening on port 12345")
+        logger.info("DLL injected successfully!")
+        logger.info("Hook DLL should be listening on port 12345")
         return True
         
     finally:

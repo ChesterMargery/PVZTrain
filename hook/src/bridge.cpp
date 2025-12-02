@@ -163,10 +163,12 @@ void ProcessCommands() {
     
     // 处理客户端命令
     if (g_clientSocket != INVALID_SOCKET) {
-        char buffer[1024];
-        int bytesRead = recv(g_clientSocket, buffer, sizeof(buffer) - 1, 0);
+        constexpr int BUFFER_SIZE = 4096;  // Increased buffer size
+        char buffer[BUFFER_SIZE];
+        int bytesRead = recv(g_clientSocket, buffer, BUFFER_SIZE - 1, 0);
         
         if (bytesRead > 0) {
+            // Ensure null termination
             buffer[bytesRead] = '\0';
             
             // 处理命令（可能包含多个命令，用换行分隔）
