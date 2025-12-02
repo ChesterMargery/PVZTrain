@@ -18,6 +18,7 @@ class Offset:
     GAME_UI = 0x7FC  # Current UI state (3 = in game)
     PLAYER_INFO = 0x82C  # PlayerInfo pointer
     TICK_MS = 0x454  # int, 每帧时长(ms), 默认10=100fps, 改成1=10倍速
+    SEED_CHOOSER = 0x774  # 选卡界面指针 (Seed Chooser Screen)
     
     # ========================================================================
     # PlayerInfo Offsets (玩家存档信息)
@@ -357,7 +358,9 @@ class Offset:
     FUNC_COB_FIRE = 0x00466D50  # Fire cob cannon (verified)
     FUNC_PLANT_READY = 0x0040FD30  # Check plant ready
     FUNC_SHOVEL = 0x00411060  # Shovel plant
-    FUNC_CHOOSE_CARD = 0x00486030  # Choose card in seed chooser
+    FUNC_CHOOSE_CARD = 0x00486030  # Choose card in seed chooser (AVZ ChooseCard)
+    FUNC_ROCK = 0x00486D20  # Rock() 开始游戏 (AVZ "Let's Rock" button)
+    FUNC_PICK_RANDOM = 0x004859B0  # PickRandomSeeds() 随机选卡 (AVZ)
     
     # ========================================================================
     # Animation Structure
