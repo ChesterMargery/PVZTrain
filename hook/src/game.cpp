@@ -51,6 +51,13 @@ uintptr_t GetGameUI() {
 int GetGameUIState() {
     uintptr_t gameUI = GetGameUI();
     if (!gameUI) return -1;
+    
+    // 验证指针是否在有效内存范围内
+    // PVZ游戏内存通常在 0x400000 - 0x1000000 范围内
+    if (gameUI < 0x400000 || gameUI > 0x10000000) {
+        return -1;
+    }
+    
     return *(int*)gameUI;
 }
 
@@ -233,9 +240,9 @@ bool EnterGame(int mode) {
     EnterGameFunc enterGame = (EnterGameFunc)Addr::FUNC_ENTER_GAME;
     
     __asm {
-        mov esi, base   // esi = base (特殊寄存器传参)
         push 1          // ok = true
         push mode       // game mode
+        mov esi, base   // esi = base (特殊寄存器传参，在push之后设置避免冲突)
         call enterGame
         add esp, 8      // 清理栈 (cdecl调用者清理栈)
     }

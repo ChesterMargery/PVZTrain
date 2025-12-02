@@ -8,6 +8,10 @@ static constexpr uintptr_t VTABLE_ADDR = 0x667bc0;  // 虚函数表地址
 static constexpr uintptr_t ORIGINAL_FUNC = 0x452650;  // 原始游戏循环函数地址
 static uint32_t g_originalVtableEntry = 0;  // 保存原始虚函数表项
 
+// 游戏内存保护区域常量
+static constexpr uintptr_t GAME_BASE_ADDR = 0x400000;  // PVZ进程基址
+static constexpr size_t GAME_MEMORY_SIZE = 0x35E000;  // 需要修改保护属性的内存区域大小
+
 // 我们的Hook函数
 void __cdecl HookedGameLoop() {
     // 处理Python命令
@@ -23,7 +27,7 @@ bool InstallHook() {
     
     // 修改虚函数表指针
     DWORD oldProtect;
-    if (!VirtualProtect((void*)0x400000, 0x35E000, PAGE_EXECUTE_READWRITE, &oldProtect)) {
+    if (!VirtualProtect((void*)GAME_BASE_ADDR, GAME_MEMORY_SIZE, PAGE_EXECUTE_READWRITE, &oldProtect)) {
         return false;
     }
     
@@ -36,7 +40,7 @@ bool InstallHook() {
     // 刷新指令缓存
     FlushInstructionCache(GetCurrentProcess(), (void*)VTABLE_ADDR, sizeof(uint32_t));
     
-    VirtualProtect((void*)0x400000, 0x35E000, oldProtect, &oldProtect);
+    VirtualProtect((void*)GAME_BASE_ADDR, GAME_MEMORY_SIZE, oldProtect, &oldProtect);
     
     g_hooked = true;
     return true;
@@ -47,7 +51,7 @@ void UninstallHook() {
     
     // 恢复原始虚函数表项
     DWORD oldProtect;
-    if (!VirtualProtect((void*)0x400000, 0x35E000, PAGE_EXECUTE_READWRITE, &oldProtect)) {
+    if (!VirtualProtect((void*)GAME_BASE_ADDR, GAME_MEMORY_SIZE, PAGE_EXECUTE_READWRITE, &oldProtect)) {
         return;
     }
     
@@ -56,7 +60,7 @@ void UninstallHook() {
     // 刷新指令缓存
     FlushInstructionCache(GetCurrentProcess(), (void*)VTABLE_ADDR, sizeof(uint32_t));
     
-    VirtualProtect((void*)0x400000, 0x35E000, oldProtect, &oldProtect);
+    VirtualProtect((void*)GAME_BASE_ADDR, GAME_MEMORY_SIZE, oldProtect, &oldProtect);
     
     g_hooked = false;
 }
